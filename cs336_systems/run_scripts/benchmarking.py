@@ -32,6 +32,9 @@ model = BasicsTransformerLM(
     rope_theta=benchmarking_config.rope_theta,
 ).to(benchmarking_config.device)
 
+# saves >25% running time for both forward and backward pass on cuda. breaks on mps.
+model = torch.compile(model)
+
 optimizer = AdamW(params=model.parameters())
 
 

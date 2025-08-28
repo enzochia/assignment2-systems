@@ -6,8 +6,8 @@
     --d_ff 1344 \
     --num_heads 16 \
     --num_layers 4 \
-    --warmup_iters 1 \
-    --benchmarking_iters 2 \
+    --warmup_iters 5 \
+    --benchmarking_iters 10 \
     --rope_theta 10000
 
 
