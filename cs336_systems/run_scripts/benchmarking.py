@@ -3,9 +3,11 @@ import logging
 from dataclasses import asdict
 from transformers import HfArgumentParser
 from cs336_systems.benchmarking import BenchmarkingConfig
-from cs336_basics.optimizer import AdamW
-from cs336_basics.model import BasicsTransformerLM
-from cs336_basics.nn_utils import clip_gradient
+# from cs336_basics.optimizer import AdamW
+# from cs336_basics.model import BasicsTransformerLM
+# from cs336_basics.nn_utils import clip_gradient
+from cs336_basics.optim import AdamW
+from cs336_basics.nn import TransformerLM, clip_gradient
 from cs336_systems.benchmarking import get_random_benchmarking_data, forward_benchmarking, backward_benchmkarking
 
 
@@ -22,7 +24,8 @@ benchmarking_config = parser.parse_args_into_dataclasses()[0]
 logging.info(f"Benchmarking on device {benchmarking_config.device} with config:")
 logging.info(f"{asdict(benchmarking_config)}")
 
-model = BasicsTransformerLM(
+# model = BasicsTransformerLM(
+model = TransformerLM(
     vocab_size=benchmarking_config.vocab_size,
     context_length=benchmarking_config.context_length,
     d_model=benchmarking_config.d_model,
