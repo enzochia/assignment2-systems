@@ -1,4 +1,4 @@
- uv run --active -m cs336_systems.run_scripts.benchmarking \
+ uv run --active -m cs336_systems.run_scripts.benchmark \
     --context_length 256 \
     --batch_size 64 \
     --vocab_size 10000 \
