@@ -22,6 +22,9 @@ class BenchmarkingConfig:
     batch_size: int | None = field(default=64)
     context_length: int | None = field(default=1024)
     vocab_size: int | None = field(default=50257)
+    use_mixed_precision: bool | None = field(default=False)
+    precision: str | None = field(default="bf16")
+    train_context_dtype: torch.dtype | None = field(default=torch.bfloat16)
 
     # Logging parameters
     wandb_logging: bool | None = field(default=False)
@@ -43,3 +46,11 @@ class BenchmarkingConfig:
             self.sync_func = torch.cuda.synchronize
         elif self.device == torch.device("mps"):
             self.sync_func = torch.mps.synchronize
+        if self.precision == "fp16":
+            self.train_context_dtype = torch.float16
+        elif self.precision == "bf16":
+            self.train_context_dtype = torch.bfloat16
+        elif self.precision == "fp32":
+            self.train_context_dtype = torch.float32
+        else:
+            raise ValueError(f"Wrong input for precision.")

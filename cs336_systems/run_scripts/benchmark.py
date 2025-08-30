@@ -2,6 +2,7 @@ import torch
 import logging
 from dataclasses import asdict
 from transformers import HfArgumentParser
+from contextlib import nullcontext
 from cs336_systems.benchmarking import BenchmarkingConfig
 # from cs336_basics.optimizer import AdamW
 # from cs336_basics.model import BasicsTransformerLM
@@ -34,31 +35,32 @@ model = TransformerLM(
     d_ff=benchmarking_config.d_ff,
     rope_theta=benchmarking_config.rope_theta,
 ).to(benchmarking_config.device)
-
 # saves >25% running time for both forward and backward pass on cuda. breaks on mps.
 model = torch.compile(model)
-
 optimizer = AdamW(params=model.parameters())
 
-
 text_input, text_output = get_random_benchmarking_data(benchmarking_config)
-
 run_time = torch.zeros(3, benchmarking_config.benchmarking_iters)
+train_context = nullcontext()
+if benchmarking_config.use_mixed_precision:
+    train_context = torch.amp.autocast(device_type=str(benchmarking_config.device), 
+                                       dtype=benchmarking_config.train_context_dtype)
 
-for it in range(benchmarking_config.warmup_iters):
-    logging.info(f"Warm-up iter #{it}")
-    _, loss = forward_benchmarking(model, benchmarking_config, text_input, text_output)
-    _ = backward_benchmkarking(optimizer, loss, benchmarking_config)
-    clip_gradient(model.parameters(), 1)
-    optimizer.step()
+with train_context:
+    for it in range(benchmarking_config.warmup_iters):
+        logging.info(f"Warm-up iter #{it}")
+        _, loss = forward_benchmarking(model, benchmarking_config, text_input, text_output)
+        _ = backward_benchmkarking(optimizer, loss, benchmarking_config)
+        clip_gradient(model.parameters(), 1)
+        optimizer.step()
 
-for it in range(benchmarking_config.benchmarking_iters):
-    logging.info(f"Benchmarking iter #{it}")
-    forward_runtime, loss = forward_benchmarking(model, benchmarking_config, text_input, text_output)
-    backward_runtime = backward_benchmkarking(optimizer, loss, benchmarking_config)
-    clip_gradient(model.parameters(), 1)
-    optimizer.step()
-    run_time[:, it] = torch.tensor([forward_runtime, backward_runtime, forward_runtime + backward_runtime])
+    for it in range(benchmarking_config.benchmarking_iters):
+        logging.info(f"Benchmarking iter #{it}")
+        forward_runtime, loss = forward_benchmarking(model, benchmarking_config, text_input, text_output)
+        backward_runtime = backward_benchmkarking(optimizer, loss, benchmarking_config)
+        clip_gradient(model.parameters(), 1)
+        optimizer.step()
+        run_time[:, it] = torch.tensor([forward_runtime, backward_runtime, forward_runtime + backward_runtime])
 run_time = run_time.mean(dim=-1, keepdim=False)
 logging.info(
     f"Average time spent: {run_time[0].item():2f} sec on forward pass, and {run_time[1].item():2f} sec on backward pass."

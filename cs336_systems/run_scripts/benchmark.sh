@@ -8,7 +8,9 @@
     --num_layers 4 \
     --warmup_iters 5 \
     --benchmarking_iters 10 \
-    --rope_theta 10000
+    --rope_theta 10000 \
+    --use_mixed_precision \
+    --precision fp16
 
 
 

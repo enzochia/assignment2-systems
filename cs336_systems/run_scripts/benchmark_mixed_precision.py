@@ -30,7 +30,7 @@ class ToyModel(nn.Module):
 
 batch_size = 32
 in_features = 64
-dtype = torch.float16
+dtype = torch.bfloat16
 text_input = torch.randn(batch_size, in_features, device=device)
 toy_model = ToyModel(in_features, in_features).to(device)
 
