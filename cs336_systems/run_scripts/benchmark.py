@@ -4,6 +4,7 @@ from dataclasses import asdict
 from transformers import HfArgumentParser
 from contextlib import nullcontext
 from cs336_systems.benchmarking import BenchmarkingConfig
+
 # from cs336_basics.optimizer import AdamW
 # from cs336_basics.model import BasicsTransformerLM
 # from cs336_basics.nn_utils import clip_gradient
@@ -43,8 +44,9 @@ text_input, text_output = get_random_benchmarking_data(benchmarking_config)
 run_time = torch.zeros(3, benchmarking_config.benchmarking_iters)
 train_context = nullcontext()
 if benchmarking_config.use_mixed_precision:
-    train_context = torch.amp.autocast(device_type=str(benchmarking_config.device), 
-                                       dtype=benchmarking_config.train_context_dtype)
+    train_context = torch.amp.autocast(
+        device_type=str(benchmarking_config.device), dtype=benchmarking_config.train_context_dtype
+    )
 
 with train_context:
     for it in range(benchmarking_config.warmup_iters):

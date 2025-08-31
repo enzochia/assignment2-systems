@@ -53,4 +53,4 @@ class BenchmarkingConfig:
         elif self.precision == "fp32":
             self.train_context_dtype = torch.float32
         else:
-            raise ValueError(f"Wrong input for precision.")
+            raise ValueError("Wrong input for precision.")
