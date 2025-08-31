@@ -18,6 +18,13 @@ def get_random_benchmarking_data(benchmarking_config: BenchmarkingConfig) -> tup
     return text_input, text_output
 
 
+def get_random_benchmarking_qkv(benchmarking_config: BenchmarkingConfig) -> tuple[torch.Tensor]:
+    q = torch.randn(benchmarking_config.batch_size, benchmarking_config.context_length, benchmarking_config.d_model, device=benchmarking_config.device, requires_grad=True)
+    k = torch.randn(benchmarking_config.batch_size, benchmarking_config.context_length, benchmarking_config.d_model, device=benchmarking_config.device, requires_grad=True)
+    v = torch.randn(benchmarking_config.batch_size, benchmarking_config.context_length, benchmarking_config.d_model, device=benchmarking_config.device, requires_grad=True)
+    return q, k, v
+
+
 def forward_benchmarking(
     # model: BasicsTransformerLM,
     model: TransformerLM,
