@@ -19,9 +19,27 @@ def get_random_benchmarking_data(benchmarking_config: BenchmarkingConfig) -> tup
 
 
 def get_random_benchmarking_qkv(benchmarking_config: BenchmarkingConfig) -> tuple[torch.Tensor]:
-    q = torch.randn(benchmarking_config.batch_size, benchmarking_config.context_length, benchmarking_config.d_model, device=benchmarking_config.device, requires_grad=True)
-    k = torch.randn(benchmarking_config.batch_size, benchmarking_config.context_length, benchmarking_config.d_model, device=benchmarking_config.device, requires_grad=True)
-    v = torch.randn(benchmarking_config.batch_size, benchmarking_config.context_length, benchmarking_config.d_model, device=benchmarking_config.device, requires_grad=True)
+    q = torch.randn(
+        benchmarking_config.batch_size,
+        benchmarking_config.context_length,
+        benchmarking_config.d_model,
+        device=benchmarking_config.device,
+        requires_grad=True,
+    )
+    k = torch.randn(
+        benchmarking_config.batch_size,
+        benchmarking_config.context_length,
+        benchmarking_config.d_model,
+        device=benchmarking_config.device,
+        requires_grad=True,
+    )
+    v = torch.randn(
+        benchmarking_config.batch_size,
+        benchmarking_config.context_length,
+        benchmarking_config.d_model,
+        device=benchmarking_config.device,
+        requires_grad=True,
+    )
     return q, k, v
 
 
@@ -30,7 +48,7 @@ def forward_benchmarking(
     model: TransformerLM,
     benchmarking_config: BenchmarkingConfig,
     text_input: torch.Tensor,
-    text_output: torch.Tensor
+    text_output: torch.Tensor,
 ) -> torch.Tensor:
     start_time = timeit.default_timer()
     benchmarking_config.sync_func()
@@ -45,11 +63,7 @@ def forward_benchmarking(
     return run_time, loss
 
 
-def backward_benchmkarking(
-    optimizer: AdamW, 
-    loss: torch.Tensor, 
-    benchmarking_config: BenchmarkingConfig
-) -> None:
+def backward_benchmkarking(optimizer: AdamW, loss: torch.Tensor, benchmarking_config: BenchmarkingConfig) -> None:
     start_time = timeit.default_timer()
     benchmarking_config.sync_func()
     if benchmarking_config.benchmark_memory:

@@ -56,6 +56,5 @@ class BenchmarkingConfig:
             self.train_context_dtype = torch.float32
         else:
             raise ValueError("Wrong input for precision.")
-        if ((self.device != torch.device("cuda")) and
-            self.benchmark_memory):
+        if (self.device != torch.device("cuda")) and self.benchmark_memory:
             raise ValueError("Memory benchmarking only supports CUDA.")

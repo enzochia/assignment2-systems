@@ -5,15 +5,13 @@ import itertools
 import pandas as pd
 from dataclasses import asdict
 from transformers import HfArgumentParser
-from contextlib import nullcontext
 from cs336_systems.benchmarking import BenchmarkingConfig
 
 # from cs336_basics.optimizer import AdamW
 # from cs336_basics.model import BasicsTransformerLM
 # from cs336_basics.nn_utils import clip_gradient
-from cs336_basics.optim import AdamW
-from cs336_basics.nn import TransformerLM, clip_gradient, scaled_dot_product_attention
-from cs336_systems.benchmarking import get_random_benchmarking_data, forward_benchmarking, backward_benchmkarking, get_random_benchmarking_qkv
+from cs336_basics.nn import scaled_dot_product_attention
+from cs336_systems.benchmarking import get_random_benchmarking_qkv
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -47,7 +45,7 @@ for seq_len, d_model in itertools.product(seq_len_dims, d_model_dims):
             o = scaled_dot_product_attention(q, k, v)
             loss = o.sum()
             loss.backward(retain_graph=True)
-        
+
         q.grad, k.grad, v.grad = None, None, None
 
         start_time = timeit.default_timer()
@@ -71,18 +69,19 @@ for seq_len, d_model in itertools.product(seq_len_dims, d_model_dims):
         torch.cuda.empty_cache()
         forward_time = "OOM"
         backward_time = "OOM"
-        peak_memory_mb = 'OOM'
-    
-    results.append({
-        "seq_len": seq_len,
-        "d_model": d_model,
-        "forward_time": forward_time,
-        "backward_time": backward_time,
-        "peak_memory": peak_memory_mb
-    })
+        peak_memory_mb = "OOM"
+
+    results.append(
+        {
+            "seq_len": seq_len,
+            "d_model": d_model,
+            "forward_time": forward_time,
+            "backward_time": backward_time,
+            "peak_memory": peak_memory_mb,
+        }
+    )
 torch.cuda.memory._record_memory_history(enabled=None)
 
 df = pd.DataFrame(results)
 print("\n--- Benchmark Results ---")
 print(df.to_string())
-    
