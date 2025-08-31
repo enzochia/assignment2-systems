@@ -25,6 +25,8 @@ class BenchmarkingConfig:
     use_mixed_precision: bool | None = field(default=False)
     precision: str | None = field(default="bf16")
     train_context_dtype: torch.dtype | None = field(default=torch.bfloat16)
+    benchmark_memory: bool | None = field(default=False)
+    benchmark_memory_path: str | None = field(default="memory_snapshot.pickle")
 
     # Logging parameters
     wandb_logging: bool | None = field(default=False)
@@ -54,3 +56,6 @@ class BenchmarkingConfig:
             self.train_context_dtype = torch.float32
         else:
             raise ValueError("Wrong input for precision.")
+        if ((self.device != torch.device("cuda")) and
+            self.benchmark_memory):
+            raise ValueError("Memory benchmarking only supports CUDA.")

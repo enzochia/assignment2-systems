@@ -56,13 +56,20 @@ with train_context:
         clip_gradient(model.parameters(), 1)
         optimizer.step()
 
+    if benchmarking_config.benchmark_memory:
+        torch.cuda.memory._record_memory_history(max_entries=1000000)
+        torch.cuda.memory._dump_snapshot(benchmarking_config.benchmark_memory_path)
     for it in range(benchmarking_config.benchmarking_iters):
         logging.info(f"Benchmarking iter #{it}")
         forward_runtime, loss = forward_benchmarking(model, benchmarking_config, text_input, text_output)
         backward_runtime = backward_benchmkarking(optimizer, loss, benchmarking_config)
         clip_gradient(model.parameters(), 1)
         optimizer.step()
+        if benchmarking_config.benchmark_memory:
+            torch.cuda.memory._dump_snapshot(benchmarking_config.benchmark_memory_path)
         run_time[:, it] = torch.tensor([forward_runtime, backward_runtime, forward_runtime + backward_runtime])
+    if benchmarking_config.benchmark_memory:
+        torch.cuda.memory._record_memory_history(enabled=None)
 run_time = run_time.mean(dim=-1, keepdim=False)
 logging.info(
     f"Average time spent: {run_time[0].item():2f} sec on forward pass, and {run_time[1].item():2f} sec on backward pass."
