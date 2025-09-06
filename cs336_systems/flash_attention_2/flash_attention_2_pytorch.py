@@ -2,56 +2,6 @@ import torch
 from typing import Tuple, Any
 
 
-# def _flash_attention_2_forward(
-#     q_ptr, k_ptr, v_ptr,
-#     o_ptr, L_ptr,
-#     q_tile_size, k_tile_size,
-#     program_id,
-#     is_causal,
-#     device = torch.device("cuda"),
-#     dtype_full = torch.float32,
-#     eps = 1e-8
-# ) -> None:
-#     d_q = q_ptr.shape[-2]
-#     d_k = k_ptr.shape[-2]
-#     d_model = q_ptr.shape[-1]
-#     d_batch = q_ptr.shape[:-2]
-#     q_block_ptr = q_tile_size * program_id
-#     q_block = q_ptr[..., q_block_ptr:(q_block_ptr + q_tile_size), :].to(dtype_full)
-#     m = torch.full([*d_batch, q_tile_size], -torch.inf, dtype=dtype_full, device=device)
-#     l = torch.zeros_like(m, dtype=dtype_full, device=device)
-#     o = torch.zeros([*d_batch, q_tile_size, d_model], dtype=dtype_full, device=device)
-#     for k_block_idx in range((d_k // k_tile_size) + 1):
-#         k_block_ptr = k_tile_size * k_block_idx
-#         if k_block_ptr < d_k:
-#             k_tile_size=min(k_tile_size, d_k - k_block_idx * k_tile_size)
-#             k_block = k_ptr[..., k_block_ptr:(k_block_ptr + k_tile_size), :].to(dtype_full)
-#             v_block = v_ptr[..., k_block_ptr:(k_block_ptr + k_tile_size), :].to(dtype_full)
-#             # [..., q_tile_size, k_tile_size]
-#             s_i_j = torch.matmul(q_block, k_block.transpose(-2, -1)) / (d_model ** 0.5)
-#             if is_causal:
-#                 causal_mask = torch.ones(seq_len, seq_len, device=q.device, dtype=torch.bool).tril(diagonal=0)
-#                 # don't do inplace masked_fill_
-#                 s_i_j = s_i_j.masked_fill(causal_mask.logical_not(), float("-inf"))
-#             m_prev = m
-#             # [..., q_tile_size]
-#             m = torch.maximum(m_prev, torch.max(s_i_j, dim=-1)[0])
-#             # [..., q_tile_size, k_tile_size]
-#             p_tilda_i_j = torch.exp(s_i_j - m.detach()[:, None])
-#             # [..., q_tile_size]
-#             l = torch.exp(m_prev - m) * l + torch.sum(p_tilda_i_j, dim=-1)
-#             # [..., q_tile_size, d_model]
-#             o = torch.exp(m_prev - m)[..., None] * o + torch.matmul(p_tilda_i_j, v_block)
-#     # [..., q_tile_size, d_model]
-#     l += eps
-#     o = (l ** (-1))[..., None] * o
-#     # [..., q_tile_size]
-#     logsumexp = m + torch.log(l)    
-#     o_ptr[..., q_block_ptr:(q_block_ptr + q_tile_size), :] = o.to(o_ptr.device)
-#     L_ptr[..., q_block_ptr:(q_block_ptr + q_tile_size)] = logsumexp.to(L_ptr.device)
-
-
-
 def _flash_attention_2_forward(
     q_ptr, k_ptr, v_ptr,
     o_ptr, L_ptr,
@@ -69,7 +19,7 @@ def _flash_attention_2_forward(
     q_block_ptr = q_tile_size * program_id
     q_block = q_ptr[..., q_block_ptr:(q_block_ptr + q_tile_size), :]
     m = torch.full([*d_batch, q_tile_size], -torch.inf, dtype=dtype_full, device=device)
-    l = torch.zeros_like(m, dtype=dtype_full, device=device)
+    l = L_ptr[..., q_block_ptr:(q_block_ptr + q_tile_size)]
     o = torch.zeros([*d_batch, q_tile_size, d_model], dtype=dtype_full, device=device)
     for k_block_idx in range((d_k // k_tile_size) + 1):
         k_block_ptr = k_tile_size * k_block_idx
@@ -112,8 +62,8 @@ class FlashAttention2_PyTorch(torch.autograd.Function):
         dtype_full = torch.float32
         q_context_len = Q.shape[-2]
         q_tile_size = 32
-        k_tile_size = 4
-        O = torch.zeros_like(Q, device=Q.device, dtype=Q.dtype)
+        k_tile_size = 16
+        O = torch.empty_like(Q)
         L = torch.zeros(Q.shape[:-1], device=Q.device, dtype=dtype_full)
         for program_id in range((q_context_len // q_tile_size) + 1):
             if program_id * q_tile_size < q_context_len:
