@@ -3,14 +3,14 @@ from typing import Tuple, Any
 
 
 def _flash_attention_2_forward(
-    q_ptr, k_ptr, v_ptr,
-    o_ptr, L_ptr,
-    q_tile_size, k_tile_size,
-    program_id,
-    is_causal,
-    device = torch.device("cuda"),
-    dtype_full = torch.float32,
-    eps = 1e-8
+    q_ptr: torch.Tensor, k_ptr: torch.Tensor, v_ptr: torch.Tensor,
+    o_ptr: torch.Tensor, L_ptr: torch.Tensor,
+    q_tile_size: int, k_tile_size: int,
+    program_id: int,
+    is_causal: bool,
+    device: torch.device = torch.device("cuda"),
+    dtype_full: torch.dtype = torch.float32,
+    eps: float = 1e-8
 ) -> None:
     d_q = q_ptr.shape[-2]
     d_k = k_ptr.shape[-2]
@@ -76,8 +76,33 @@ class FlashAttention2_PyTorch(torch.autograd.Function):
         return O
 
     @staticmethod
-    def backward(ctx) -> None:
-        raise NotImplementedError
+    def backward(ctx, dO: torch.Tensor) -> None:
+        Q, K, V, O, L = ctx.saved_tensors
+        d_model = Q.shape[-1]
+
+        # [..., context_len_q]
+        D = (O * dO).sum(dim=-1)
+        # [..., context_len_q, context_len_k]
+        S = torch.matmul(Q, K.transpose(-2, -1)) / (d_model ** 0.5)
+        if ctx.is_causal:
+            causal_mask = torch.ones(Q.shape[-2], K.shape[-2], device=Q.device, dtype=torch.bool).tril(diagonal=0)
+            # don't do inplace masked_fill_
+            S = S.masked_fill(causal_mask.logical_not(), float("-inf"))
+        P = torch.exp(S - L[..., None])
+        # [..., context_len_k, d_model]
+        dV = torch.matmul(P.transpose(-2, -1), dO)
+        # [..., context_len_q, context_len_k]
+        dP = torch.matmul(dO, V.transpose(-2, -1))
+        dS = P * (dP - D[..., None])
+        # [..., context_len_q, d_model]
+        dQ = torch.matmul(dS, K) / (d_model ** 0.5)
+        # [..., context_len_k, d_model]
+        dK = torch.matmul(dS.transpose(-2, -1), Q) / (d_model ** 0.5)
+        return dQ, dK, dV, None
+
+
+
+        
 
 
 
