@@ -35,15 +35,15 @@ def _flash_attention_2_forward(
                 s_i_j = s_i_j.masked_fill(causal_mask.logical_not(), float("-inf"))
             m_prev = m
             # [..., q_tile_size]
-            m = torch.maximum(m_prev, torch.max(s_i_j, dim=-1)[0])
-            stabilization_term = torch.exp(m_prev.detach() - m.detach())
+            m = torch.maximum(m_prev, torch.max(s_i_j.to(dtype_full), dim=-1)[0])
+            stabilization_term = torch.exp(m_prev - m)
             # [..., q_tile_size, k_tile_size]
-            p_tilda_i_j = torch.exp(s_i_j - m.detach()[..., None])
+            p_tilda_i_j = torch.exp(s_i_j - m[..., None])
             # [..., q_tile_size]
             l = stabilization_term * l + torch.sum(p_tilda_i_j, dim=-1)
             # [..., q_tile_size, d_model]
-            o = stabilization_term[..., None] * o + torch.matmul(p_tilda_i_j, v_block)
-    # [..., q_tile_size, d_model]
+            o = stabilization_term[..., None] * o + torch.matmul(p_tilda_i_j.to(v_block.dtype), v_block)
+    # [..., q_tile_size]
     l += eps
     o = (1 / l)[..., None] * o
     # [..., q_tile_size]
