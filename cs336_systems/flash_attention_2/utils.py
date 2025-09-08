@@ -54,22 +54,6 @@ def _flash_attention_2_forward(
 
 
 
-# @triton.jit
-# def flash_fwd_kernel(
-#     Q_ptr, K_ptr, V_ptr,
-#     O_ptr, L_ptr,
-#     stride_qb, stride_qq, stride_qd,
-#     stride_kb, stride_kk, stride_kd,
-#     stride_vb, stride_vk, stride_vd,
-#     stride_ob, stride_oq, stride_od,
-#     stride_lb, stride_lq,
-#     N_QUERIES, N_KEYS,
-#     scale,
-#     D: tl.constexpr,
-#     Q_TILE_SIZE: tl.constexpr,
-#     K_TILE_SIZE: tl.constexpr,
-#     IS_CAUSAL: tl.constexpr,
-# ):
 @triton.jit
 def flash_fwd_kernel(
     Q_ptr, K_ptr, V_ptr,
@@ -79,9 +63,8 @@ def flash_fwd_kernel(
     stride_vb, stride_vk, stride_vd,
     stride_ob, stride_oq, stride_od,
     stride_lb, stride_lq,
+    N_QUERIES, N_KEYS,
     scale,
-    N_QUERIES: tl.constexpr,
-    N_KEYS: tl.constexpr,
     D: tl.constexpr,
     Q_TILE_SIZE: tl.constexpr,
     K_TILE_SIZE: tl.constexpr,
@@ -143,14 +126,11 @@ def flash_fwd_kernel(
     l = tl.zeros([Q_TILE_SIZE], dtype=dtype_full)
     o = tl.zeros([Q_TILE_SIZE, D], dtype=dtype_full)
     # [Q_TILE_SIZE, D]
-    # make it float32?
-    q_tile = tl.load(Q_block_ptr, boundary_check=(0, 1), padding_option="zero")
-    # [Q_TILE_SIZE]
-    # l_tile = til.load(L_block_ptr, boundary_check=(0,), padding_option="zero")
+    q_tile = tl.load(Q_block_ptr, boundary_check=(0, 1), padding_option="zero").to(dtype_full)
 
     for k_tile_idx in range(tl.cdiv(N_KEYS, K_TILE_SIZE)):
         # [K_TILE_SIZE, D]
-        k_tile = tl.load(K_block_ptr, boundary_check=(0, 1), padding_option="zero")
+        k_tile = tl.load(K_block_ptr, boundary_check=(0, 1), padding_option="zero").to(dtype_full)
         v_tile = tl.load(V_block_ptr, boundary_check=(0, 1), padding_option="zero")
         # [Q_TILE_SIZE, K_TILE_SIZE]
         score_tile = tl.dot(q_tile, tl.trans(k_tile)) * scale
@@ -159,6 +139,7 @@ def flash_fwd_kernel(
             k_seq_idx = tl.arange(0, K_TILE_SIZE) + k_tile_idx * K_TILE_SIZE
             causal_mask = q_seq_idx[:, None] >= k_seq_idx[None, :]
             score_tile = tl.where(causal_mask, score_tile, float("-inf"))
+
         m_prev = m
         # [Q_TILE_SIZE]
         m = tl.maximum(m_prev, tl.max(score_tile, axis=-1))
@@ -169,7 +150,8 @@ def flash_fwd_kernel(
         l = stabilization_term * l + tl.sum(p_tile, axis=-1)
         # [Q_TILE_SIZE, D]
         o = stabilization_term[:, None] * o 
-        o = tl.dot(p_tile.to(v_tile.dtype), v_tile, acc=o)
+        o = tl.dot(p_tile.to(V_block_ptr.type.element_ty), v_tile, acc=o)
+
         K_block_ptr = tl.advance(K_block_ptr, (K_TILE_SIZE, 0))
         V_block_ptr = tl.advance(V_block_ptr, (K_TILE_SIZE, 0))
     # [Q_TILE_SIZE]

@@ -19,8 +19,6 @@ class FlashAttention2(torch.autograd.Function):
         Q = Q.contiguous().view(-1, *Q.shape[-2:])
         K = K.contiguous().view(-1, *K.shape[-2:])
         V = V.contiguous().view(-1, *V.shape[-2:])
-        # dtype_full? 
-        # O = torch.empty_like(Q)
         O = torch.zeros(Q.shape, device=Q.device, dtype=dtype_full)
         L = torch.zeros(Q.shape[:-1], device=Q.device, dtype=dtype_full)
 
