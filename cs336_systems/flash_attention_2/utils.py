@@ -70,7 +70,6 @@ def flash_fwd_kernel(
     K_TILE_SIZE: tl.constexpr,
     IS_CAUSAL: tl.constexpr,
 ):
-    tl.device_print("##########################################################################")
     # Program indices
     query_tile_index = tl.program_id(0)
     batch_index = tl.program_id(1)
@@ -85,6 +84,7 @@ def flash_fwd_kernel(
         block_shape=(Q_TILE_SIZE, D),
         order=(1, 0),
     )
+    # test it here, whether it's faster this way or directly load as transpose of K
     K_block_ptr = tl.make_block_ptr(
         K_ptr + batch_index * stride_kb,
         shape=(N_KEYS, D),
@@ -118,19 +118,17 @@ def flash_fwd_kernel(
         order=(0,),
     )
 
-
     dtype_full = tl.float32
     eps=1e-8
-
     m = tl.full([Q_TILE_SIZE], float("-inf"), dtype=dtype_full)
     l = tl.zeros([Q_TILE_SIZE], dtype=dtype_full)
     o = tl.zeros([Q_TILE_SIZE, D], dtype=dtype_full)
     # [Q_TILE_SIZE, D]
-    q_tile = tl.load(Q_block_ptr, boundary_check=(0, 1), padding_option="zero").to(dtype_full)
+    q_tile = tl.load(Q_block_ptr, boundary_check=(0, 1), padding_option="zero")
 
     for k_tile_idx in range(tl.cdiv(N_KEYS, K_TILE_SIZE)):
         # [K_TILE_SIZE, D]
-        k_tile = tl.load(K_block_ptr, boundary_check=(0, 1), padding_option="zero").to(dtype_full)
+        k_tile = tl.load(K_block_ptr, boundary_check=(0, 1), padding_option="zero")
         v_tile = tl.load(V_block_ptr, boundary_check=(0, 1), padding_option="zero")
         # [Q_TILE_SIZE, K_TILE_SIZE]
         score_tile = tl.dot(q_tile, tl.trans(k_tile)) * scale
@@ -139,7 +137,6 @@ def flash_fwd_kernel(
             k_seq_idx = tl.arange(0, K_TILE_SIZE) + k_tile_idx * K_TILE_SIZE
             causal_mask = q_seq_idx[:, None] >= k_seq_idx[None, :]
             score_tile = tl.where(causal_mask, score_tile, float("-inf"))
-
         m_prev = m
         # [Q_TILE_SIZE]
         m = tl.maximum(m_prev, tl.max(score_tile, axis=-1))
@@ -150,8 +147,7 @@ def flash_fwd_kernel(
         l = stabilization_term * l + tl.sum(p_tile, axis=-1)
         # [Q_TILE_SIZE, D]
         o = stabilization_term[:, None] * o 
-        o = tl.dot(p_tile.to(V_block_ptr.type.element_ty), v_tile, acc=o)
-
+        o = tl.dot(p_tile.to(v_tile.dtype), v_tile, acc=o)
         K_block_ptr = tl.advance(K_block_ptr, (K_TILE_SIZE, 0))
         V_block_ptr = tl.advance(V_block_ptr, (K_TILE_SIZE, 0))
     # [Q_TILE_SIZE]

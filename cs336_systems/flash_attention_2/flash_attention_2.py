@@ -16,10 +16,12 @@ class FlashAttention2(torch.autograd.Function):
         q_tile_size = 32
         k_tile_size = 32
 
-        Q = Q.contiguous().view(-1, *Q.shape[-2:])
-        K = K.contiguous().view(-1, *K.shape[-2:])
-        V = V.contiguous().view(-1, *V.shape[-2:])
-        O = torch.zeros(Q.shape, device=Q.device, dtype=dtype_full)
+        batch_sizes = Q.shape[:-2]
+        Q = Q.view(-1, *Q.shape[-2:])
+        K = K.view(-1, *K.shape[-2:])
+        V = V.view(-1, *V.shape[-2:])
+        # if something goes wrong with precision, it could be here
+        O = torch.zeros_like(Q)
         L = torch.zeros(Q.shape[:-1], device=Q.device, dtype=dtype_full)
 
         flash_fwd_kernel[((Q.shape[-2] +  q_tile_size - 1) // q_tile_size, Q.shape[0])](
@@ -39,7 +41,7 @@ class FlashAttention2(torch.autograd.Function):
         )
         ctx.save_for_backward(Q, K, V, O, L)
         ctx.is_causal = is_causal
-        # reshape O
+        O = O.view(*batch_sizes, *O.shape[-2:])
         return O
 
     @staticmethod
