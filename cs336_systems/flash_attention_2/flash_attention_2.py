@@ -40,7 +40,7 @@ class FlashAttention2(torch.autograd.Function):
         )
         ctx.save_for_backward(Q, K, V, O, L)
         ctx.is_causal = is_causal
-        ctx.tile_sizes = (32, 32)
+        ctx.tile_sizes = (q_tile_size, k_tile_size)
         O = O.view(*batch_sizes, *O.shape[-2:])
         return O
 
@@ -56,29 +56,28 @@ class FlashAttention2(torch.autograd.Function):
         # [..., context_len_q]
         D = (O * dO).sum(dim=-1)
 
-        dQ = torch.zeros_like(Q)
+        dQ = torch.zeros_like(Q, dtype=torch.float32)
         dK = torch.zeros_like(K)
         dV = torch.zeros_like(V)
 
         flash_bwd_kernel[((K.shape[-2] +  k_tile_size - 1) // k_tile_size, Q.shape[0])](
             dO_ptr=dO, Q_ptr=Q, K_ptr=K,
-            V_ptr=V, O_ptr=O, L_ptr=L,
+            V_ptr=V, L_ptr=L, D_ptr=D,
             dQ_ptr=dQ, dK_ptr=dK, dV_ptr=dV,
-            D_ptr=D,
             stride_qb=Q.stride(0), stride_qq=Q.stride(1), stride_qd=Q.stride(2),
             stride_kb=K.stride(0), stride_kk=K.stride(1), stride_kd=K.stride(2),
             stride_vb=V.stride(0), stride_vk=V.stride(1), stride_vd=V.stride(2),
             stride_ob=O.stride(0), stride_oq=O.stride(1), stride_od=O.stride(2),
             stride_lb=L.stride(0), stride_lq=L.stride(1),
-            N_QUERIES=Q.shape[-2], N_KEYS=K.shape[-2],
             scale= 1 / (Q.shape[-1] ** 0.5),
+            N_QUERIES=Q.shape[-2], N_KEYS=K.shape[-2],
             D=Q.shape[-1],
             Q_TILE_SIZE=q_tile_size,
             K_TILE_SIZE=k_tile_size,
             IS_CAUSAL=is_causal,
         )
 
-        dQ = dQ.view(*batch_sizes, *dO.shape[-2:])
+        dQ = dQ.view(*batch_sizes, *dO.shape[-2:]).to(Q.dtype)
         dK = dK.view(*batch_sizes, *dO.shape[-2:])
         dV = dV.view(*batch_sizes, *dO.shape[-2:])
 
