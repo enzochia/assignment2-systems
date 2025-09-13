@@ -1,3 +1,3 @@
-from .utils import setup, benchmark_all_reduce
+from .utils import benchmark_all_reduce
 
-__all__ = ["setup", "benchmark_all_reduce"]
+__all__ = ["benchmark_all_reduce"]

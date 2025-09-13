@@ -1,17 +1,18 @@
 import torch
 import torch.multiprocessing as mp
 import pandas as pd
-from cs336_systems.collective_operations import setup, benchmark_all_reduce
+from cs336_systems.collective_operations import benchmark_all_reduce
 
 if __name__ == "__main__":
-    world_size_list = [2, 4, 6]
+    world_size_list = [2, 4]
     size_mb_list = [1, 10, 100, 1000]
-    # backend_dict = {"gloo": "CPU", "nccl": "GPU"}
-    backend_dict = {"gloo": "CPU"}
+    backend_dict = {"gloo": "CPU", "nccl": "GPU"}
+    # backend_dict = {"nccl": "GPU"}
     warmup_iters, benchmark_iters = 5, 10
     results = []
     for backend in backend_dict:
         if torch.cuda.is_available() and backend == "nccl":
+            print(f"{torch.cuda.device_count()} GPUs are found.")
             world_size_list = [x for x in world_size_list if x <= torch.cuda.device_count()]
         for size_mb in size_mb_list:
             for world_size in world_size_list:
