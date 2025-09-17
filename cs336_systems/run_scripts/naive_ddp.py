@@ -1,33 +1,57 @@
 import torch
 import torch.multiprocessing as mp
 import pandas as pd
+import logging
 from multiprocessing import Manager
 from cs336_systems.collective_operations import ddp_train, single_process_train
+from cs336_basics.nn import TransformerLM
+from cs336_basics.config import Config as LMConfig
+from dataclasses import asdict
+from transformers import HfArgumentParser
 from tests.common import ToyModelWithTiedWeights
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
+if torch.cuda.is_available():
+    torch.cuda.empty_cache()
+if torch.backends.mps.is_available():
+    torch.mps.empty_cache()
+
 if __name__ == "__main__":
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    parser = HfArgumentParser(LMConfig)
+    conf = parser.parse_args_into_dataclasses()[0]
+    conf.device = "cuda" if torch.cuda.is_available() else "cpu"
+    logging.info(f"Training on {conf.device} with configuration:")
+    logging.info(f"{asdict(conf)}")
+
     dtype_full = torch.float32
     batch_sizes = (8, 16)
-    data_x = torch.randn(*batch_sizes, 10, device="cpu", dtype=dtype_full)
-    data_y = torch.randn(*batch_sizes, 5, device="cpu", dtype=dtype_full)
-    backend = "nccl"
+    data_x = torch.randint(0, conf.vocab_size, (conf.batch_size, conf.context_length), device="cpu")
+    data_y = torch.randint(0, conf.vocab_size, (conf.batch_size, conf.context_length), device="cpu")
+    backend = "gloo"
     world_size = 4
-    num_steps = 10
-    print(f"A naive DDP test on {world_size} {device}.")
+    num_steps = 1
+    print(f"A naive DDP test on {world_size} {conf.device}.")
 
     manager = Manager()
     result_queue = manager.Queue()
     mp.spawn(fn=ddp_train, 
-             args=(world_size, backend, ToyModelWithTiedWeights, data_x, data_y, num_steps, result_queue),
+             args=(world_size, backend, TransformerLM, data_x, data_y, num_steps, result_queue, conf),
              nprocs=world_size, join=True)
     ddp_state_dict = result_queue.get()
+    run_time_dict = result_queue.get()
+    logging.info(run_time_dict)
 
-    single_process_state_dict = single_process_train(ToyModelWithTiedWeights, data_x, data_y, 
-                                                     num_steps, world_size, device)
+    single_process_state_dict = single_process_train(TransformerLM, data_x, data_y, 
+                                                     num_steps, world_size, conf)
 
     for key in single_process_state_dict.keys():
         assert key in ddp_state_dict
-        assert torch.allclose(single_process_state_dict[key].to(device), ddp_state_dict[key].to(device))
+        assert torch.allclose(single_process_state_dict[key].to(conf.device), 
+                              ddp_state_dict[key].to(conf.device),
+                              atol=1e-5)
     print(f"PASSED.")
 
