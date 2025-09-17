@@ -44,7 +44,8 @@ def benchmark_all_reduce(rank, world_size, backend,
 
 
 def ddp_train(rank, world_size, backend, ModelClass, 
-              data_x, data_y, num_steps, result_queue, conf):
+              data_x, data_y, warmup_iters, 
+              benchmark_iters, result_queue, conf):
     device = _setup_process_group(rank, world_size, backend)
     device = "cpu" if backend == "gloo" else device
     try:
@@ -72,23 +73,24 @@ def ddp_train(rank, world_size, backend, ModelClass,
 
         run_time_list = []
         toy_model.train()
-        for _ in range(num_steps):
+        for iter in range(warmup_iters + benchmark_iters):
             step_start_time = timeit.default_timer()
             optimizer.zero_grad()
             logits = toy_model(data_x)
             loss = loss_fn(logits.view(-1, conf.vocab_size), prob_label.view(-1))
             loss.backward()
+            comm_start_time = timeit.default_timer()
             for param in toy_model.parameters():
-                comm_start_time = timeit.default_timer()
                 dist.all_reduce(param.grad, op=dist.ReduceOp.SUM, async_op=False)
                 # Do not need this when async_op=False, if not for profiling
                 # torch.cuda.synchronize()
-                comm_time = timeit.default_timer() - comm_start_time
                 param.grad /= world_size
+            comm_time = timeit.default_timer() - comm_start_time
             optimizer.step()
             step_time = timeit.default_timer() - step_start_time
-            run_time_list.append({"step_time": step_time,
-                                  "comm_time": comm_time})
+            if iter >= warmup_iters:
+                run_time_list.append({"step_time": step_time,
+                                    "comm_time": comm_time})
         run_time_dict = {"avg_step_time": sum(x["step_time"] for x in run_time_list) / len(run_time_list),
                          "avg_comm_time": sum(x["comm_time"] for x in run_time_list) / len(run_time_list)}
         

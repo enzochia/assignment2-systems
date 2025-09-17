@@ -33,20 +33,23 @@ if __name__ == "__main__":
     data_y = torch.randint(0, conf.vocab_size, (conf.batch_size, conf.context_length), device="cpu")
     backend = "gloo"
     world_size = 4
-    num_steps = 1
+    warmup_iters = 4
+    benchmark_iters = 8
     print(f"A naive DDP test on {world_size} {conf.device}.")
 
     manager = Manager()
     result_queue = manager.Queue()
     mp.spawn(fn=ddp_train, 
-             args=(world_size, backend, TransformerLM, data_x, data_y, num_steps, result_queue, conf),
+             args=(world_size, backend, TransformerLM, data_x, data_y, warmup_iters, 
+                   benchmark_iters, result_queue, conf),
              nprocs=world_size, join=True)
     ddp_state_dict = result_queue.get()
-    run_time_dict = result_queue.get()
+    run_time_dict = result_queue.get() 
     logging.info(run_time_dict)
 
     single_process_state_dict = single_process_train(TransformerLM, data_x, data_y, 
-                                                     num_steps, world_size, conf)
+                                                     warmup_iters + benchmark_iters, 
+                                                     world_size, conf)
 
     for key in single_process_state_dict.keys():
         assert key in ddp_state_dict
