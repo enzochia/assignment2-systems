@@ -1,4 +1,4 @@
- uv run --active -m cs336_systems.run_scripts.naive_ddp \
+ uv run --active -m cs336_systems.run_scripts.benchmark_naive_ddp \
     --data_path ../../assignment_1/CS336-assignment1-basics/data/ts/encoded/ \
     --context_length 2048 \
     --batch_size 4 \
