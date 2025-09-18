@@ -8,7 +8,8 @@ class DDPOverlapCommComp(torch.nn.Module):
         self.module = module
         self.handles = []
         for param in self.module.parameters():
-            dist.broadcast(param, src=0)
+            with torch.no_grad():
+                dist.broadcast(param, src=0)
             if param.requires_grad:
                 param.register_post_accumulate_grad_hook(self.all_reduce_grad)
 
@@ -23,3 +24,4 @@ class DDPOverlapCommComp(torch.nn.Module):
     def finish_gradient_synchronization(self):
         for handle in self.handles:
             handle.wait()
+        self.handles.clear()

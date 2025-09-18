@@ -80,22 +80,23 @@ def ddp_train(rank, world_size, backend, ModelClass,
             logits = toy_model(data_x)
             loss = loss_fn(logits.view(-1, conf.vocab_size), prob_label.view(-1))
             loss.backward()
+            # enable this line when benchmarking on CUDA
+            torch.cuda.synchronize()
             comm_start_time = timeit.default_timer()
             if do_flattened_comm:
                 grad_tensor_template = [param.grad for param in toy_model.parameters() if param.grad is not None]
                 flattened_param = torch._utils._flatten_dense_tensors(tensors=grad_tensor_template)
-                dist.all_reduce(flattened_param, op=dist.ReduceOp.SUM, async_op=False)
+                dist.all_reduce(flattened_param, op=dist.ReduceOp.AVG, async_op=False)
                 unflattened_params = torch._utils._unflatten_dense_tensors(flattened_param, tensors=grad_tensor_template)
                 for param, param_tensor in zip(
                     (param for param in toy_model.parameters() if param.grad is not None),  
                     unflattened_params):
-                    param.grad.copy_(param_tensor / world_size)
+                    param.grad.copy_(param_tensor)
             else:
                 for param in toy_model.parameters():
-                    dist.all_reduce(param.grad, op=dist.ReduceOp.SUM, async_op=False)
-                    # Do not need this when async_op=False, if not for profiling
-                    # torch.cuda.synchronize()
-                    param.grad /= world_size
+                    dist.all_reduce(param.grad, op=dist.ReduceOp.AVG, async_op=False)
+            # enable this line when benchmarking on CUDA
+            torch.cuda.synchronize()
             comm_time = timeit.default_timer() - comm_start_time
             optimizer.step()
             step_time = timeit.default_timer() - step_start_time

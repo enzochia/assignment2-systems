@@ -3,9 +3,9 @@
     --context_length 256 \
     --batch_size 4 \
     --vocab_size 10000 \
-    --d_model 768 \
-    --d_ff 3072 \
-    --num_heads 12 \
+    --d_model 1600 \
+    --d_ff 6400 \
+    --num_heads 25 \
     --num_layers 12 \
     --rope_theta 1e4 \
     --activation_function SwiGLU \

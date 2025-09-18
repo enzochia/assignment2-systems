@@ -31,7 +31,7 @@ if __name__ == "__main__":
     batch_sizes = (8, 16)
     data_x = torch.randint(0, conf.vocab_size, (conf.batch_size, conf.context_length), device="cpu")
     data_y = torch.randint(0, conf.vocab_size, (conf.batch_size, conf.context_length), device="cpu")
-    backend = "gloo"
+    backend = "nccl"
     world_size = 4
     warmup_iters = 2
     benchmark_iters = 4
