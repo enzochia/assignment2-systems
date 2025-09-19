@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Type
 from cs336_systems.flash_attention_2 import FlashAttention2_PyTorch, FlashAttention2
-from cs336_systems.collective_operations import DDPOverlapCommComp
+from cs336_systems.collective_operations import DDPOverlapCommComp, DDPOverlapBucketed
 
 import torch
 
@@ -92,7 +92,7 @@ def get_ddp_bucketed(module: torch.nn.Module, bucket_size_mb: float) -> torch.nn
     Returns:
         Instance of a DDP class.
     """
-    raise NotImplementedError
+    return DDPOverlapBucketed(module, bucket_size_mb)
 
 
 def ddp_bucketed_on_after_backward(ddp_model: torch.nn.Module, optimizer: torch.optim.Optimizer):
@@ -107,7 +107,7 @@ def ddp_bucketed_on_after_backward(ddp_model: torch.nn.Module, optimizer: torch.
             Optimizer being used with the DDP-wrapped model.
     """
     # For example: ddp_model.finish_gradient_synchronization()
-    raise NotImplementedError
+    ddp_model.finish_gradient_synchronization()
 
 
 def ddp_bucketed_on_train_batch_start(ddp_model: torch.nn.Module, optimizer: torch.optim.Optimizer):
