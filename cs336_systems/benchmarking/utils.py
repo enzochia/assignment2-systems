@@ -1,10 +1,6 @@
 import torch
 import timeit
 from cs336_systems.benchmarking import BenchmarkingConfig
-
-# from cs336_basics.optimizer import AdamW
-# from cs336_basics.model import BasicsTransformerLM
-# from cs336_basics.nn_utils import cross_entropy
 from cs336_basics.optim import AdamW
 from cs336_basics.nn import TransformerLM, cross_entropy
 
@@ -44,7 +40,6 @@ def get_random_benchmarking_qkv(benchmarking_config: BenchmarkingConfig) -> tupl
 
 
 def forward_benchmarking(
-    # model: BasicsTransformerLM,
     model: TransformerLM,
     benchmarking_config: BenchmarkingConfig,
     text_input: torch.Tensor,

@@ -13,8 +13,3 @@
     --benchmark_memory_path memory_snapshots/memory_snapshot.pickle
    #  --use_mixed_precision \
    #  --precision fp16 \
-
-
-
-
-
