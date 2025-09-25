@@ -1,0 +1,14 @@
+ uv run --active -m cs336_systems.run_scripts.benchmark_sharded_optim \
+    --data_path ../../assignment_1/CS336-assignment1-basics/data/ts/encoded/ \
+    --context_length 256 \
+    --batch_size 4 \
+    --vocab_size 10000 \
+    --d_model 1024 \
+    --d_ff 4096 \
+    --num_layers 4 \
+    --num_heads 16 \
+    --warmup_iters 5 \
+    --benchmarking_iters 10 \
+    --rope_theta 10000 \
+    --benchmark_memory \
+    --benchmark_memory_path memory_snapshots_sharded_optim/memory_snapshot.pickle

@@ -1,6 +1,7 @@
 import torch
 from dataclasses import dataclass, field
 from collections.abc import Callable
+from typing import Optional
 
 
 @dataclass
@@ -10,6 +11,9 @@ class BenchmarkingConfig:
         if torch.cuda.is_available()
         else (torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu"))
     )
+
+    # Data parameters
+    data_path: Optional[str] = field(default="data/ts/encoded/")
 
     # Model parameters
     d_model: int | None = field(default=768)

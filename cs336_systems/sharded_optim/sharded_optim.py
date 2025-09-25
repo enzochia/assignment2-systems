@@ -11,7 +11,7 @@ class ShardedOptimizer(optim.Optimizer):
     """
     def __init__(self, 
                  params, 
-                 optimizer_cls: Type[optim.Optimizer] = optim.Optimizer,
+                 optimizer_cls: Type[optim.Optimizer] = AdamW,
                  **kwargs: Any):
         self.rank = dist.get_rank()
         self.world_size = dist.get_world_size()
@@ -45,5 +45,3 @@ class ShardedOptimizer(optim.Optimizer):
         for handle in self.handle_list:
             handle.wait()
         self.handle_list.clear
-
-
